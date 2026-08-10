@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sample-app
+  namespace: sample-app
+  labels:
+    app.kubernetes.io/name: sample-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sample-app.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sample-app
+                port:
+                  number: 80
+---
+# Alternative for cloud clusters (EKS/GKE/AKS): expose directly via a
+# cloud LoadBalancer instead of/alongside Ingress. Left disabled by default
+# here because on a local kind cluster a LoadBalancer Service just sits in
+# <pending> with no cloud controller to satisfy it. See README "Public
+# access" section for how to switch.
+#
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: sample-app-lb
+#   namespace: sample-app
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app.kubernetes.io/name: sample-app
+#     app.kubernetes.io/instance: sample-app
+#   ports:
+#     - port: 80
+#       targetPort: http

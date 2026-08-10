@@ -1,0 +1,32 @@
+# kind cluster config
+#
+# Why kind:
+#   - Runs a real multi-node-capable Kubernetes cluster inside Docker containers.
+#   - Free, fast to spin up/tear down, no cloud account required for grading.
+#   - Behaves like a "real" cluster (unlike Docker Desktop's single-node k8s),
+#     so the manifests we write here (probes, resources, ingress) are portable
+#     to EKS/GKE/AKS with no changes other than the Ingress class/annotations.
+#
+# We label the control-plane node so the ingress-nginx controller (deployed
+# via its official "kind" manifest) schedules onto it, and we map host ports
+# 80/443 into the node so http://localhost works without extra port-forwarding.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  - role: worker
+  - role: worker
