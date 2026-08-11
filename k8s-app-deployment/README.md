@@ -57,13 +57,6 @@ El enunciado permite cualquiera de las dos opciones. Elegí **Ingress
   enrutamiento por host/path y un lugar natural para terminar TLS, y
   permite que varios servicios compartan una única IP externa en lugar de
   aprovisionar un LB de nube por servicio.
-- **En un clúster de nube real** (EKS/GKE/AKS) este diseño funciona sin
-  cambios — el controlador de ingress de la nube aprovisiona su LB
-  automáticamente. Si se prefiere específicamente un Service de tipo
-  `LoadBalancer`, se incluye un ejemplo comentado al final de
-  `manifests/04-ingress.yaml` — basta con cambiar el
-  `ingressClassName`/las anotaciones por lo que use el controlador del
-  clúster destino, y es un cambio de un solo recurso.
 
 ---
 
@@ -134,18 +127,11 @@ por lo que el daemon debe estar activo primero.
 ## 3. Desplegar
 
 ```bash
-git clone <este-repositorio>
-cd k8s-app-deployment
+git clone https://github.com/sebael5/reto-devops-abstracta.git
+cd reto-devops-abstracta/k8s-app-deployment
 
 ./scripts/deploy.sh
 ```
-
-Qué hace el script: crea un clúster `kind` de 3 nodos
-(`kind/kind-cluster-config.yaml`), instala `ingress-nginx` (manifiesto
-específico para kind, de modo que los puertos 80/443 de tu equipo se
-mapean directamente al controlador de ingress) y `metrics-server` (para que
-el HPA tenga datos de CPU sobre los cuales escalar), y luego aplica
-`manifests/`.
 
 Agregar a `/etc/hosts`:
 ```
@@ -158,31 +144,6 @@ curl http://sample-app.local/
 ./scripts/smoke-test.sh
 ```
 
-### Paso a paso manual (equivalente al script, por si se prefiere ejecutarlo
-a mano para la entrevista)
-
-```bash
-kind create cluster --name sample-app --config kind/kind-cluster-config.yaml
-
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-kubectl wait --namespace ingress-nginx --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller --timeout=180s
-
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-kubectl apply -f manifests/
-
-kubectl get pods -n sample-app
-kubectl get ingress -n sample-app
-```
-
-Los manifiestos en `manifests/` están numerados en orden de aplicación
-(`00-namespace.yaml` hasta `06-pdb.yaml`), de modo que `kubectl apply -f
-manifests/` los aplica en un orden razonable — aunque el manejo de
-consistencia eventual propio de Kubernetes hace que el orden exacto rara
-vez importe en la práctica (por ejemplo, el Deployment simplemente
-reintentará hasta que exista el Namespace).
-
 ## 4. Verificar
 
 ```bash
@@ -190,7 +151,7 @@ kubectl get deploy,rs,pod,svc,ingress,hpa,pdb -n sample-app
 kubectl describe pod -n sample-app <nombre-del-pod>   # inspeccionar el estado de los probes y los eventos
 curl http://sample-app.local/
 ```
-Al golpear la URL repetidamente debería verse distintos valores de
+Al golpepegarle la URL repetidamente debería verse distintos valores de
 `hostname` en la respuesta JSON, confirmando que ambas réplicas están
 recibiendo tráfico a través del Service/Ingress.
 
@@ -205,46 +166,23 @@ queda nada más por limpiar.
 
 ---
 
-## 6. Qué haría diferente para un despliegue de producción real
-
-Documentando recortes de alcance intencionales, ya que el enunciado pide
-tanto el razonamiento como un artefacto funcional:
-
-- **Entrega vía GitOps** (Argo CD / Flux) en lugar de `kubectl apply` desde
-  una laptop — declarativo, auditable, con detección de drift.
-- **Helm o Kustomize** una vez que haya más de un entorno
-  (dev/staging/prod) que gestionar — para un solo entorno, los manifiestos
-  planos son más simples de leer y más fáciles de defender línea por línea
-  que una capa de templating, por eso decidí mantenerlo plano aquí.
-- **Un registro privado + digests de imagen** en lugar de una imagen
-  pública por tag, y **NetworkPolicies** para restringir el tráfico
-  este-oeste — se omitieron aquí para mantener el ejercicio ejecutable en
-  un solo comando.
-- **cert-manager** para certificados TLS reales en el Ingress — el Ingress
-  actual no tiene bloque de TLS porque necesitaría un nombre de dominio
-  real y un emisor ACME para tener sentido.
-- **Configuración/secretos externalizados** mediante un gestor de secretos
-  adecuado si la app tuviera credenciales reales — podinfo no necesita
-  ninguna aquí.
-- **CI** para validar (`kubeconform`/`kubeval`) y construir/publicar
-  imágenes antes de aplicar cualquier manifiesto.
-
-## 7. Estructura del repositorio
+## 6. Estructura del repositorio
 
 ```
 .
-├── kind/kind-cluster-config.yaml   # topología del clúster local
-├── manifests/                      # YAML para kubectl apply (numerados = orden de aplicación)
-│   ├── 00-namespace.yaml
-│   ├── 01-serviceaccount.yaml
-│   ├── 02-deployment.yaml
-│   ├── 03-service.yaml
-│   ├── 04-ingress.yaml
-│   ├── 05-hpa.yaml
-│   └── 06-pdb.yaml
-├── scripts/
-│   ├── deploy.sh
-│   ├── smoke-test.sh
-│   └── cleanup.sh
+├──reto-devops-abstracta/k8s-app-deployment
+├─── kind/kind-cluster-config.yaml   # topología del clúster local
+├─── manifests/                      # YAML para kubectl apply (numerados = orden de aplicación)
+│   ├─── 00-namespace.yaml
+│   ├─── 01-serviceaccount.yaml
+│   ├─── 02-deployment.yaml
+│   ├─── 03-service.yaml
+│   ├─── 04-ingress.yaml
+│   ├─── 05-hpa.yaml
+│   └─── 06-pdb.yaml
+├─── scripts/
+│   ├─── deploy.sh
+│   ├─── smoke-test.sh
+│   └─── cleanup.sh
 └── README.md
 ```
